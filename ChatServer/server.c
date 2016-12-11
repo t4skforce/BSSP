@@ -45,6 +45,7 @@ void remove_client(client_t *client)
 	for(i=0;i<aktclients;i++){
 		if(clientfds[i]==client) {
 			clientfds[i]=clientfds[aktclients-1];
+			close(client->sock);
 			break;
 		}
 	}
