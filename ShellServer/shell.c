@@ -2,7 +2,6 @@
 
 #define POSIX_C_SOURCE 201112L
 
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,14 +10,22 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include <grp.h>
+#include <pthread.h>
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
 #define NAME "Name"
 #define MATNR "MatNR"
+
+#define LOGPATH "/var/log/"
+#define LOGEXT ".log"
+#define LOGFILE LOGPATH MATNR LOGEXT
 
 #define SOCKETQUEUE 5
 #define SERVERPORT 4315
@@ -37,12 +44,13 @@ int sumask(char **command, struct tm start);
 int printenv(char **command, struct tm start);
 int info(char **command, struct tm start);
 int setpath(char **command, struct tm start);
+int getlog(char **command, struct tm start);
 
 // internal command mapping
 char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info",
-		"setpath" };
+		"setpath", "getprot", "getlog" };
 int (*builtin_func[])(char **,
-		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath
+		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog
 };
 int builtin_cnt() {
 	return sizeof(builtin_cmd) / sizeof(char *);
@@ -61,34 +69,52 @@ int isBG(char *line) {
 	return 0;
 }
 
-void clienthandler(int socket,struct tm start) {
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+FILE *LOGFD;
+
+void logcommand(char *ipaddr,char *cmd){
+	pthread_mutex_lock(&log_mutex);
+	fprintf(LOGFD,"%s: %s\n",ipaddr,cmd);
+	fflush(LOGFD);
+	pthread_mutex_unlock(&log_mutex);
+}
+
+void clienthandler(int socket,char *ipaddr, struct tm start) {
 	// redirect io to socket
 	char line[MAXLEN];
 	char * cmd[MAXWORDS];
 	int execstat;
 	int bg = 0;
+
 	dup2(socket, STDOUT_FILENO); /* duplicate socket on stdout */
 	dup2(socket, STDERR_FILENO); /* duplicate socket on stderr too */
 	do {
 		prompt(); // display input prompt
 		readline(socket, line, MAXLEN); // read input line
 		if(line[0]!='\0'){
+			char logline[MAXLEN]={0};
+			strncpy(logline,line,strlen(line));
 			bg = isBG(line); // search &
-			splitcommand(line, cmd); // split commaand into parts (tokenize)
+			splitcommand(line, cmd); // split command into parts (tokenize)
 			execstat = execcmd(cmd, bg, start); // run internal command or execute file in forked thread
+			if(execstat == 0) {
+				logcommand(ipaddr, &logline);
+			}
 			fflush(stdout);
 		}
-	} while (execstat == 1); // run in loop until execcmd returns != 1
+	} while (execstat != -1); // run in loop until execcmd returns != 1
 }
 
 int main(int argc, char **argv) {
 	time_t t = time(NULL);
 	struct tm start = *localtime(&t);
+	LOGFD = fopen(LOGFILE, "a");
 
 	struct sockaddr_in srvaddr;
 	struct sockaddr clientaddr;
 	int serverfd, clientfd;
 	int clientaddlen = sizeof(srvaddr);
+	char ipstr[INET_ADDRSTRLEN];
 
 	srvaddr.sin_family = AF_INET;
 	srvaddr.sin_addr.s_addr = INADDR_ANY;
@@ -116,10 +142,11 @@ int main(int argc, char **argv) {
 			close(serverfd);
 			return 3;
 		}
+		inet_ntop(clientaddr.sa_family, &(((struct sockaddr_in *) &clientaddr)->sin_addr), ipstr, clientaddlen);
 		pid_t pid = fork();
 		switch (pid) {
 		case 0: // Child
-			clienthandler(clientfd, start);
+			clienthandler(clientfd, ipstr, start);
 			close(clientfd);
 			exit(0);
 			break;
@@ -130,6 +157,7 @@ int main(int argc, char **argv) {
 			continue;
 		}
 	}
+	fclose(LOGFILE);
 }
 
 /**
@@ -175,7 +203,7 @@ void splitcommand(char *zeile, char ** vec) {
  */
 int sexit(char **command, struct tm start) {
 	printf("Goodbye!\r\n");
-	return 0;
+	return -1;
 }
 
 /**
@@ -187,10 +215,10 @@ int cd(char **command, struct tm start) {
 	} else {
 		if (chdir(command[1]) != 0) {
 			perror("error cd:");
-			return 0;
+			return 1;
 		}
 	}
-	return 1;
+	return 0;
 }
 
 /**
@@ -203,7 +231,7 @@ int pwd(char **command, struct tm start) {
 	} else {
 		perror("getcwd:");
 	}
-	return 1;
+	return 0;
 }
 
 /**
@@ -242,7 +270,7 @@ int id(char **command, struct tm start) {
 		printf("(%s)", gr->gr_name);
 
 	printf("\r\n");
-	return 1;
+	return 0;
 }
 
 /**
@@ -254,7 +282,7 @@ int printenv(char **command, struct tm start) {
 	char **env;
 	for (env = environ; *env != NULL; ++env)
 		printf("%s\r\n", *env);
-	return 1;
+	return 0;
 }
 
 /**
@@ -266,7 +294,7 @@ int info(char **command, struct tm start) {
 	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday,
 			start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min,
 			start.tm_sec);
-	return 1;
+	return 0;
 }
 
 /**
@@ -285,7 +313,7 @@ int setpath(char **command, struct tm start) {
 			printf("new Path: %s\r\n", buff);
 		}
 	}
-	return 1;
+	return 0;
 }
 
 /**
@@ -295,7 +323,23 @@ int sumask(char **command, struct tm start) {
 	mode_t mask = umask(0);
 	umask(mask);
 	printf("%04o\r\n", mask);
-	return 1;
+	return 0;
+}
+
+/**
+ *
+ */
+int getlog(char **command, struct tm start) {
+	if (command[1] == NULL) {
+		fprintf(stderr, "expected argument to \"%s\"\r\n",command[0]);
+	} else {
+		int retVal;
+		char * cmd[]={"tail","-n",command[1],LOGFILE,NULL};
+		pthread_mutex_lock(&log_mutex);
+		retVal = execfile(cmd,0);
+		pthread_mutex_unlock(&log_mutex);
+		return retVal;
+	}
 }
 
 /**
@@ -346,9 +390,11 @@ int execfile(char **cmd, int bg) {
 		if (bg != 1) {
 			// parent wait for exit process
 			waitpid(pid, &status, 0);
+			return status;
 		}
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 /**
