@@ -15,6 +15,7 @@
 #define MAXPATHLEN 4096
 #define BUFSIZE 2048
 #define DEBUG 1
+#define MAGICBYTES "Name515635200"
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -68,11 +69,10 @@ int main(int argc, char **argv) {
 }
 
 int CheckMagicBytes(int tfd) {
-	char *magic = "Neumair515635200";
 	char fmagic[16];
-	if (read(tfd, fmagic, strlen(magic)) > 0) {
-		if (!strcmp(fmagic, magic)) {
-			printf("Backup-Type: %s\n", magic);
+	if (read(tfd, fmagic, strlen(MAGICBYTES)) > 0) {
+		if (!strcmp(fmagic, MAGICBYTES)) {
+			printf("Backup-Type: %s\n", MAGICBYTES);
 			return 1;
 		}
 	}

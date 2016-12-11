@@ -15,6 +15,8 @@
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
+#define NAME "Name"
+#define MATNR "MatNR"
 
 // parsing & helper
 char * readline(char *s, size_t max);
@@ -180,7 +182,7 @@ int printenv(char **command, struct tm start) {
  * internal function display shell info
  */
 int info(char **command, struct tm start) {
-	printf("Shell von: Neumair is141315\n");
+	printf("Shell von: %s %s\n", NAME, MATNR);
 	printf("PID: %i\n", getpid());
 	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\n", start.tm_mday,
 			start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min,
@@ -242,21 +244,23 @@ int execfile(char **cmd, int bg) {
 	pid_t pid;
 	int status;
 	pid = fork();
-	if (pid == 0) {
-		// child exec file
-		if (bg == 1) {
-			if(setpgid(0,0)==-1){
-				perror("setpgid");
-			}
+	switch (pid) {
+	case 0: // Child
+		// if we run in background we change the process group so signals are ignored
+		if (bg == 1 && setpgid(0, 0) == -1) {
+			perror("setpgid");
 		}
 		if (execvp(cmd[0], cmd) == -1) {
 			perror("execvp:");
 		}
 		exit(1);
-	} else if (pid < 0) {
-		// forking error
+		break;
+	case -1: // Error forking
 		perror("forking error");
-	} else {
+		break;
+	default: // Parent
+		// parent process
+		// parent gets signal handler to ignore int and quit and stay running in foreground
 		signal(SIGINT, &parent_trap);
 		signal(SIGQUIT, &parent_trap);
 		if (bg != 1) {

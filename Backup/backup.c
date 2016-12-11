@@ -16,6 +16,7 @@
 #define MAXPATHLEN 4096
 #define BUFSIZE 2048
 #define DEBUG 1
+#define MAGICBYTES "Name515635200"
 
 void BackupNode(const char *nodename, const struct stat *tinode, int tfd);
 void WriteMagicBytes(int tfd);
@@ -60,8 +61,7 @@ int main(int argc, char **argv) {
 }
 
 void WriteMagicBytes(int tfd) {
-	char *magic = "Neumair515635200";
-	write(tfd, magic, strlen(magic));
+	write(tfd, MAGICBYTES, strlen(MAGICBYTES));
 }
 
 // backup layout
