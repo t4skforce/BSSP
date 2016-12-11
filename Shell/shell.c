@@ -244,8 +244,10 @@ int execfile(char **cmd, int bg) {
 	pid = fork();
 	if (pid == 0) {
 		// child exec file
-		if (bg != 1) {
-			//TODO: new process group here!!
+		if (bg == 1) {
+			if(setpgid(0,0)==-1){
+				perror("setpgid");
+			}
 		}
 		if (execvp(cmd[0], cmd) == -1) {
 			perror("execvp:");
