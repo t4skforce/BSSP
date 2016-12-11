@@ -13,7 +13,7 @@
 #include <rawio.h>
 
 #define SERVERNAME "127.0.0.1"
-#define SERVERPORT 2205
+#define SERVERPORT 4315
 #define MAXCLIENTBUFF 2050
 #define MSGBUFF 1024
 

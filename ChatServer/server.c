@@ -13,7 +13,7 @@
 #define SOCKETQUEUE 5
 #define MAXCLIENTS 20
 #define MAXCLIENTBUFF 1024
-#define SERVERPORT 2205
+#define SERVERPORT 4315
 
 typedef struct {
   int sock;
