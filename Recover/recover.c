@@ -20,6 +20,7 @@
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 void RecoverBackup(int bfd);
+int CheckMagicBytes(int tfd);
 int ReadName(int bfd, char *name);
 int ReadStat(int bfd, struct stat *inode);
 void RecoverFile(int bfd, const char *fname, struct stat *inode);
@@ -52,13 +53,30 @@ int main(int argc, char **argv) {
 
 	// check ob wirklich backup datei
 	if (S_ISREG(backupinode.st_mode)) {
-		// run recovery
-		RecoverBackup(backupfd);
-		close(backupfd);
+		if (CheckMagicBytes(backupfd) == 1) {
+			// run recovery
+			RecoverBackup(backupfd);
+			close(backupfd);
+		} else {
+			fprintf(stderr, "given backup archive is not compatible\n");
+			return 5;
+		}
 	} else {
 		fprintf(stderr, "we require a file to recover\n");
 		return 4;
 	}
+}
+
+int CheckMagicBytes(int tfd) {
+	char *magic = "Neumair515635200";
+	char fmagic[16];
+	if (read(tfd, fmagic, strlen(magic)) > 0) {
+		if (!strcmp(fmagic, magic)) {
+			printf("Backup-Type: %s\n", magic);
+			return 1;
+		}
+	}
+	return 0;
 }
 
 void RecoverBackup(int bfd) {
@@ -73,11 +91,16 @@ void RecoverBackup(int bfd) {
 		}
 
 		if (S_ISREG(backupnode.st_mode)) {
+			if(backupnode.st_nlink > 1) {
+				fprintf(stderr, "link-counter: %i. hardlinks will not be restored and create new files.\n",(int)backupnode.st_nlink);
+			}
 			// if file recover contents
 			RecoverFile(bfd, name, &backupnode);
 		} else if (S_ISDIR(backupnode.st_mode)) {
 			// recover dir if dir
 			RecoverDir(name, &backupnode);
+		} else {
+			fprintf(stderr, "this type is currently not supported.\n");
 		}
 	}
 }
@@ -122,7 +145,7 @@ void RecoverFile(int bfd, const char *fname, struct stat *inode) {
 	char buf[BUFSIZE];
 	int fileEnd = inode->st_size;
 	int targetfd;
-	if ((targetfd = creat(fname, inode->st_mode)) == -1) {
+	if ((targetfd = creat(fname, 0666)) == -1) {
 		perror("Backuptarget: ");
 		exit(2);
 	}
@@ -133,6 +156,14 @@ void RecoverFile(int bfd, const char *fname, struct stat *inode) {
 #endif
 		write(targetfd, buf, cnt);
 		fileEnd -= BUFSIZE;
+	}
+	// chmod
+	if(fchmod(targetfd,inode->st_mode)==-1) {
+		perror("fchmod");
+	}
+	// chown uid/gid
+	if(fchown(targetfd, inode->st_uid, inode->st_gid)==-1) {
+		perror("chown");
 	}
 	close(targetfd);
 	printf("recovered file %s\n", fname);

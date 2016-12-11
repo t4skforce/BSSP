@@ -18,6 +18,7 @@
 #define DEBUG 1
 
 void BackupNode(const char *nodename, const struct stat *tinode, int tfd);
+void WriteMagicBytes(int tfd);
 void HeaderWrite(const char *nodename, const struct stat *srcinode,
 		int tfd);
 void WriteContent(const char *nodename, int tfd);
@@ -46,6 +47,7 @@ int main(int argc, char **argv) {
 		return 3;
 	}
 
+	WriteMagicBytes(targetfd);
 	if (argc == 1) {
 		BackupNode(".", &targetinode, targetfd);
 	} else {
@@ -55,6 +57,11 @@ int main(int argc, char **argv) {
 	}
 	close(targetfd);
 	return 0;
+}
+
+void WriteMagicBytes(int tfd) {
+	char *magic = "Neumair515635200";
+	write(tfd, magic, strlen(magic));
 }
 
 // backup layout
