@@ -36,7 +36,7 @@ char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info",
 		"setpath" };
 int (*builtin_func[])(char **,
 		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath
-		};
+};
 int builtin_cnt() {
 	return sizeof(builtin_cmd) / sizeof(char *);
 }
@@ -129,32 +129,36 @@ int pwd(char **command, struct tm start) {
  * print uid, euid, gid, egid (Namen, is existant)
  * source: http://git.savannah.gnu.org/gitweb/?p=coreutils.git;a=blob;f=src/id.c;h=05d98a5d08a98aea2c9e804b4a33ac4d1dea153a;hb=HEAD
  */
-int id(char **command, struct tm start){
+int id(char **command, struct tm start) {
 	struct passwd *pwd = NULL;
 	struct group *gr = NULL;
 
 	uid_t uid = getuid();
-	printf("uid:%i",uid);
+	printf("uid:%i", uid);
 	pwd = getpwuid(uid);
-	if (pwd) printf ("(%s)", pwd->pw_name);
+	if (pwd)
+		printf("(%s)", pwd->pw_name);
 
 	printf(" ");
 
 	uid_t euid = geteuid();
-	printf("euid:%i",euid);
+	printf("euid:%i", euid);
 	pwd = getpwuid(euid);
-	if (pwd) printf ("(%s)", pwd->pw_name);
+	if (pwd)
+		printf("(%s)", pwd->pw_name);
 
 	printf(" ");
 	gid_t gid = getgid();
-	printf("gid:%i",gid);
+	printf("gid:%i", gid);
 	gr = getgrgid(gid);
-	if (gr) printf ("(%s)", gr->gr_name);
+	if (gr)
+		printf("(%s)", gr->gr_name);
 
 	gid_t egid = getegid();
-	printf("egid:%i",egid);
+	printf("egid:%i", egid);
 	gr = getgrgid(egid);
-	if (gr) printf ("(%s)", gr->gr_name);
+	if (gr)
+		printf("(%s)", gr->gr_name);
 
 	printf("\n");
 	return 1;
@@ -165,10 +169,10 @@ int id(char **command, struct tm start){
  * http://git.savannah.gnu.org/gitweb/?p=coreutils.git;a=blob;f=src/printenv.c;h=e351d3a1ad82ceb195926490a333099f13231812;hb=HEAD
  */
 extern char **environ;
-int printenv(char **command, struct tm start){
+int printenv(char **command, struct tm start) {
 	char **env;
 	for (env = environ; *env != NULL; ++env)
-	printf ("%s%c", *env, '\n');
+		printf("%s%c", *env, '\n');
 	return 1;
 }
 
@@ -228,6 +232,7 @@ void prompt() {
 
 void parent_trap(int sig) {
 	fprintf(stderr, "\nCaught signal(%i).\n", sig);
+	signal(sig, &parent_trap);
 }
 
 /**
@@ -239,6 +244,9 @@ int execfile(char **cmd, int bg) {
 	pid = fork();
 	if (pid == 0) {
 		// child exec file
+		if (bg != 1) {
+			//TODO: new process group here!!
+		}
 		if (execvp(cmd[0], cmd) == -1) {
 			perror("execvp:");
 		}
