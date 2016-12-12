@@ -103,6 +103,8 @@ void clienthandler(int socket,char *ipaddr, struct tm start) {
 			fflush(stdout);
 		}
 	} while (execstat != -1); // run in loop until execcmd returns != 1
+	printf("disconnect.\n");
+	close(socket);
 }
 
 int main(int argc, char **argv) {
@@ -147,7 +149,6 @@ int main(int argc, char **argv) {
 		switch (pid) {
 		case 0: // Child
 			clienthandler(clientfd, ipstr, start);
-			close(clientfd);
 			exit(0);
 			break;
 		case -1: // Error forking
