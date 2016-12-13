@@ -2,7 +2,7 @@
  * Program: Socket Client
  *
  * Authors:
- * is141415 - Neumair Florian
+ * is141315 - Neumair Florian
  * is141305 - Gimpl Thomas
  *
  */

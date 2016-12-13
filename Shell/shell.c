@@ -1,5 +1,10 @@
-// shell.c
-
+/*
+ * Program: Shell
+ *
+ * Authors:
+ * is141315 - Neumair Florian
+ *
+ */
 #define POSIX_C_SOURCE 201112L
 
 #include <stdio.h>
@@ -15,8 +20,8 @@
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
-#define NAME "Name"
-#define MATNR "MatNR"
+#define NAME "Florian Neumair"
+#define MATNR "is141315"
 
 // parsing & helper
 char * readline(char *s, size_t max);

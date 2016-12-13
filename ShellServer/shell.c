@@ -2,7 +2,7 @@
  * Program: Shell Server
  *
  * Authors:
- * is141415 - Neumair Florian
+ * is141315 - Neumair Florian
  * is141305 - Gimpl Thomas
  *
  */
@@ -24,7 +24,7 @@
 #define MAXLEN 2048
 #define MAXWORDS 1024
 #define NAME "Florian Neumair"
-#define MATNR "is141415"
+#define MATNR "is141315"
 
 #define SOCKETQUEUE 5
 #define SERVERPORT 5315
