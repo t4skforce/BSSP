@@ -39,6 +39,7 @@ typedef struct {
 	char ip[INET_ADDRSTRLEN];
 	char cwd[MAXLEN];
 	char path[MAXLEN];
+	mode_t mask;
 	struct tm start;
 } client_t;
 
@@ -163,6 +164,8 @@ int startshell() {
 		return 4;
 	}
 	strcpy(client.path,getenv("PATH"));
+	client.mask = umask(0);
+	umask(client.mask);
 
 	while (1) {
 		if ((clientfd = accept(serverfd, (struct sockaddr *) &clientaddr,
@@ -180,6 +183,7 @@ int startshell() {
 		arg->fp = fdopen(clientfd, "a");
 		strcpy(arg->cwd,client.cwd);
 		strcpy(arg->path,client.path);
+		arg->mask = client.mask;
 		// launch thread
 		pthread_t thrid;
 		int err;
@@ -400,13 +404,21 @@ int setpath(char **command, struct tm start) {
 	return 0;
 }
 
+void umask_fake() {
+	umask(client.mask);
+}
+
 /**
  * display current umask
  */
 int sumask(char **command, struct tm start) {
-	mode_t mask = umask(0);
-	umask(mask);
-	fprintf(client.fp,"%04o\r\n", mask);
+	if (command[1] == NULL) {
+		fprintf(client.fp, "%04o\n", client.mask);
+	} else {
+		char buf[4] = { 0 };
+		strncat(buf, command[1], 3);
+		client.mask = strtol(buf, NULL, 8);
+	}
 	return 0;
 }
 
@@ -456,6 +468,7 @@ int execfile(char **cmd, int bg) {
 		if (bg == 1 && setpgid(0, 0) == -1) {
 			fprintf(client.fp,"execfile setpgid: %s\r\n",strerror(errno));
 		}
+		umask_fake();
 		path_fake();
 		cwd_fake();
 		dup2(client.sock, STDOUT_FILENO); /* duplicate socket on stdout */

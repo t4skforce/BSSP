@@ -292,9 +292,7 @@ int printenv(char **command, struct tm start) {
 int info(char **command, struct tm start) {
 	printf("Shell von: %s %s\r\n", NAME, MATNR);
 	printf("PID: %i\r\n", getpid());
-	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday,
-			start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min,
-			start.tm_sec);
+	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday, start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min, start.tm_sec);
 	return 0;
 }
 
@@ -307,7 +305,7 @@ int setpath(char **command, struct tm start) {
 	} else {
 		if (setenv("PATH",command[1], 1) != 0) {
 			perror("error setenv:");
-			return 0;
+			return 1;
 		} else {
 			printf("new Path: %s\r\n", getenv("PATH"));
 		}
@@ -319,9 +317,16 @@ int setpath(char **command, struct tm start) {
  * display current umask
  */
 int sumask(char **command, struct tm start) {
-	mode_t mask = umask(0);
-	umask(mask);
-	printf("%04o\r\n", mask);
+	if (command[1] == NULL) {
+		mode_t mask = umask(0);
+		umask(mask);
+		printf("%04o\n", mask);
+	} else {
+		char buf[4] = { 0 };
+		strncat(buf, command[1], 3);
+		long int nmask = strtol(buf, NULL, 8);
+		umask(nmask);
+	}
 	return 0;
 }
 

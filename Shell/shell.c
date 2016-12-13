@@ -34,10 +34,8 @@ int info(char **command, struct tm start);
 int setpath(char **command, struct tm start);
 
 // internal command mapping
-char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info",
-		"setpath" };
-int (*builtin_func[])(char **,
-		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath
+char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info", "setpath" };
+int (*builtin_func[])(char **, struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath
 };
 int builtin_cnt() {
 	return sizeof(builtin_cmd) / sizeof(char *);
@@ -86,8 +84,7 @@ char * readline(char *s, size_t max) {
  */
 void splitcommand(char *zeile, char ** vec) {
 	int i = 0;
-	for (vec[i] = strtok(zeile, " \t\n"); vec[i];
-			vec[++i] = strtok(NULL, " \t\n"))
+	for (vec[i] = strtok(zeile, " \t\n"); vec[i]; vec[++i] = strtok(NULL, " \t\n"))
 		;
 }
 
@@ -184,9 +181,7 @@ int printenv(char **command, struct tm start) {
 int info(char **command, struct tm start) {
 	printf("Shell von: %s %s\n", NAME, MATNR);
 	printf("PID: %i\n", getpid());
-	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\n", start.tm_mday,
-			start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min,
-			start.tm_sec);
+	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\n", start.tm_mday, start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min, start.tm_sec);
 	return 1;
 }
 
@@ -195,7 +190,7 @@ int info(char **command, struct tm start) {
  */
 int setpath(char **command, struct tm start) {
 	if (command[1] == NULL) {
-		fprintf(stderr, "expected argument to \"setpath\"\n");
+		fprintf(stderr, "expected argument to \"setpath\"\r\n");
 	} else {
 		if (setenv("PATH", command[1], 1) != 0) {
 			perror("error setenv:");
@@ -211,9 +206,16 @@ int setpath(char **command, struct tm start) {
  * display current umask
  */
 int sumask(char **command, struct tm start) {
-	mode_t mask = umask(0);
-	umask(mask);
-	printf("%04o\n", mask);
+	if (command[1] == NULL) {
+		mode_t mask = umask(0);
+		umask(mask);
+		printf("%04o\n", mask);
+	} else {
+		char buf[4] = { 0 };
+		strncat(buf, command[1], 3);
+		long int nmask = strtol(buf, NULL, 8);
+		umask(nmask);
+	}
 	return 1;
 }
 

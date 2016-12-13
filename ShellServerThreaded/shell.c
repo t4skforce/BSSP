@@ -39,6 +39,7 @@ typedef struct {
 	char ip[INET_ADDRSTRLEN];
 	char cwd[MAXLEN];
 	char path[MAXLEN];
+	mode_t mask;
 	struct tm start;
 } client_t;
 
@@ -67,10 +68,8 @@ int getlog(char **command, struct tm start);
 int clientinfo(char **command, struct tm start);
 
 // internal command mapping
-char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info",
-		"setpath", "getprot", "getlog", "clientinfo" };
-int (*builtin_func[])(char **,
-		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog, &clientinfo
+char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info", "setpath", "getprot", "getlog", "clientinfo" };
+int (*builtin_func[])(char **, struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog, &clientinfo
 };
 int builtin_cnt() {
 	return sizeof(builtin_cmd) / sizeof(char *);
@@ -106,7 +105,7 @@ void logcommand(char *ipaddr, char *cmd) {
 }
 
 void clienthandler(void * arg) {
-	memcpy(&client,&(*(client_t *)arg),sizeof(client_t)); // set thread local values
+	memcpy(&client, &(*(client_t *) arg), sizeof(client_t)); // set thread local values
 	free(arg); // free maloc value
 	// redirect io to socket
 	char line[MAXLEN];
@@ -128,7 +127,7 @@ void clienthandler(void * arg) {
 			fflush(client.fp);
 		}
 	} while (execstat != -1); // run in loop until execcmd returns != 1
-	fprintf(client.fp,"disconnect.\n");
+	fprintf(client.fp, "disconnect.\n");
 	close(client.sock);
 }
 
@@ -166,11 +165,12 @@ int main(int argc, char **argv) {
 		perror("getcwd:");
 		return 4;
 	}
-	strcpy(client.path,getenv("PATH"));
+	strcpy(client.path, getenv("PATH"));
+	client.mask = umask(0);
+	umask(client.mask);
 
 	while (1) {
-		if ((clientfd = accept(serverfd, (struct sockaddr *) &clientaddr,
-				(socklen_t*) &clientaddlen)) == -1) {
+		if ((clientfd = accept(serverfd, (struct sockaddr *) &clientaddr, (socklen_t*) &clientaddlen)) == -1) {
 			perror("accept:");
 			close(serverfd);
 			return 3;
@@ -178,17 +178,16 @@ int main(int argc, char **argv) {
 		// init thread local struct client_t client
 		client_t *arg = malloc(sizeof(client_t));
 		arg->start = start;
-		inet_ntop(clientaddr.sa_family,
-				&(((struct sockaddr_in *) &clientaddr)->sin_addr), arg->ip,
-				clientaddlen);
+		inet_ntop(clientaddr.sa_family, &(((struct sockaddr_in *) &clientaddr)->sin_addr), arg->ip, clientaddlen);
 		arg->sock = clientfd;
 		arg->fp = fdopen(clientfd, "a");
-		strcpy(arg->cwd,client.cwd);
-		strcpy(arg->path,client.path);
+		strcpy(arg->cwd, client.cwd);
+		strcpy(arg->path, client.path);
+		arg->mask = client.mask;
 		// launch thread
 		pthread_t thrid;
 		int err;
-		if ((err = pthread_create(&thrid, NULL, clienthandler, (void *)arg)) != 0) {
+		if ((err = pthread_create(&thrid, NULL, clienthandler, (void *) arg)) != 0) {
 			fprintf(client.fp, "pthread_create: %s", strerror(err));
 			close(serverfd);
 			return 4;
@@ -230,8 +229,7 @@ char * readline(int socket, char *s, size_t max) {
  */
 void splitcommand(char *zeile, char ** vec) {
 	int i = 0;
-	for (vec[i] = strtok(zeile, " \t\r\n"); vec[i];
-			vec[++i] = strtok(NULL, " \t\r\n"))
+	for (vec[i] = strtok(zeile, " \t\r\n"); vec[i]; vec[++i] = strtok(NULL, " \t\r\n"))
 		;
 }
 
@@ -239,7 +237,7 @@ void splitcommand(char *zeile, char ** vec) {
  * internal function exit shell
  */
 int sexit(char **command, struct tm start) {
-	fprintf(client.fp,"Goodbye!\r\n");
+	fprintf(client.fp, "Goodbye!\r\n");
 	return -1;
 }
 
@@ -248,7 +246,7 @@ int sexit(char **command, struct tm start) {
  */
 void cwd_fake() {
 	if (chdir(client.cwd) != 0) {
-		fprintf(client.fp,"cwd_fake: %s\r\n",strerror(errno));
+		fprintf(client.fp, "cwd_fake: %s\r\n", strerror(errno));
 	}
 }
 
@@ -263,12 +261,12 @@ int cd(char **command, struct tm start) {
 		pthread_mutex_lock(&cwd_mutex);
 		cwd_fake();
 		if (chdir(command[1]) != 0) {
-			fprintf(client.fp,"cd chdir: %s\r\n",strerror(errno));
+			fprintf(client.fp, "cd chdir: %s\r\n", strerror(errno));
 			retVal = 1;
 		}
 		// update to new cwd
 		if (getcwd(client.cwd, sizeof(client.cwd)) == NULL) {
-			fprintf(client.fp,"getcwd: %s\r\n",strerror(errno));
+			fprintf(client.fp, "getcwd: %s\r\n", strerror(errno));
 		}
 		pthread_mutex_unlock(&cwd_mutex);
 	}
@@ -292,33 +290,33 @@ int id(char **command, struct tm start) {
 	struct group *gr = NULL;
 
 	uid_t uid = getuid();
-	fprintf(client.fp,"uid:%i", uid);
+	fprintf(client.fp, "uid:%i", uid);
 	pwd = getpwuid(uid);
 	if (pwd)
-		fprintf(client.fp,"(%s)", pwd->pw_name);
+		fprintf(client.fp, "(%s)", pwd->pw_name);
 
-	fprintf(client.fp," ");
+	fprintf(client.fp, " ");
 
 	uid_t euid = geteuid();
-	fprintf(client.fp,"euid:%i", euid);
+	fprintf(client.fp, "euid:%i", euid);
 	pwd = getpwuid(euid);
 	if (pwd)
-		fprintf(client.fp,"(%s)", pwd->pw_name);
+		fprintf(client.fp, "(%s)", pwd->pw_name);
 
-	fprintf(client.fp," ");
+	fprintf(client.fp, " ");
 	gid_t gid = getgid();
-	fprintf(client.fp,"gid:%i", gid);
+	fprintf(client.fp, "gid:%i", gid);
 	gr = getgrgid(gid);
 	if (gr)
-		fprintf(client.fp,"(%s)", gr->gr_name);
+		fprintf(client.fp, "(%s)", gr->gr_name);
 
 	gid_t egid = getegid();
-	fprintf(client.fp,"egid:%i", egid);
+	fprintf(client.fp, "egid:%i", egid);
 	gr = getgrgid(egid);
 	if (gr)
-		fprintf(client.fp,"(%s)", gr->gr_name);
+		fprintf(client.fp, "(%s)", gr->gr_name);
 
-	fprintf(client.fp,"\r\n");
+	fprintf(client.fp, "\r\n");
 	return 0;
 }
 
@@ -326,19 +324,17 @@ int id(char **command, struct tm start) {
  * internal function display shell info
  */
 int info(char **command, struct tm start) {
-	fprintf(client.fp,"Shell von: %s %s\r\n", NAME, MATNR);
-	fprintf(client.fp,"PID: %i\r\n", getpid());
-	fprintf(client.fp,"Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday,
-			start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min,
-			start.tm_sec);
+	fprintf(client.fp, "Shell von: %s %s\r\n", NAME, MATNR);
+	fprintf(client.fp, "PID: %i\r\n", getpid());
+	fprintf(client.fp, "Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday, start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min, start.tm_sec);
 	return 0;
 }
 
 int clientinfo(char **command, struct tm start) {
-	fprintf(client.fp,"IP: %s \r\n", client.ip);
-	fprintf(client.fp,"FP: %d \r\n", client.sock);
-	fprintf(client.fp,"PATH: %s \r\n", client.path);
-	fprintf(client.fp,"CWD: %s \r\n", client.cwd);
+	fprintf(client.fp, "IP: %s \r\n", client.ip);
+	fprintf(client.fp, "FP: %d \r\n", client.sock);
+	fprintf(client.fp, "PATH: %s \r\n", client.path);
+	fprintf(client.fp, "CWD: %s \r\n", client.cwd);
 	return 0;
 }
 
@@ -346,8 +342,8 @@ int clientinfo(char **command, struct tm start) {
  * Change into thread-local working directory
  */
 void path_fake() {
-	if (setenv("PATH",client.path, 1) != 0) {
-		fprintf(client.fp,"path_fake putenv: %s\r\n",strerror(errno));
+	if (setenv("PATH", client.path, 1) != 0) {
+		fprintf(client.fp, "path_fake putenv: %s\r\n", strerror(errno));
 	}
 }
 
@@ -361,7 +357,7 @@ int printenv(char **command, struct tm start) {
 	pthread_mutex_lock(&path_mutex);
 	path_fake();
 	for (env = environ; *env != NULL; ++env)
-		fprintf(client.fp,"%s\r\n", *env);
+		fprintf(client.fp, "%s\r\n", *env);
 	pthread_mutex_unlock(&path_mutex);
 	return 0;
 }
@@ -373,19 +369,27 @@ int setpath(char **command, struct tm start) {
 	if (command[1] == NULL) {
 		fprintf(client.fp, "expected argument to \"setpath\"\r\n");
 	} else {
-		snprintf(client.path,MAXLEN,"%s",command[1]);
-		fprintf(client.fp,"new Path: %s\r\n", client.path);
+		snprintf(client.path, MAXLEN, "%s", command[1]);
+		fprintf(client.fp, "new Path: %s\r\n", client.path);
 	}
 	return 0;
+}
+
+void umask_fake() {
+	umask(client.mask);
 }
 
 /**
  * display current umask
  */
 int sumask(char **command, struct tm start) {
-	mode_t mask = umask(0);
-	umask(mask);
-	fprintf(client.fp,"%04o\r\n", mask);
+	if (command[1] == NULL) {
+		fprintf(client.fp, "%04o\n", client.mask);
+	} else {
+		char buf[4] = { 0 };
+		strncat(buf, command[1], 3);
+		client.mask = strtol(buf, NULL, 8);
+	}
 	return 0;
 }
 
@@ -412,7 +416,7 @@ int getlog(char **command, struct tm start) {
 void prompt() {
 	struct utsname s_uname;
 	if (uname(&s_uname) == 0) {
-		fprintf(client.fp,"%s %s $ ", s_uname.nodename, client.cwd);
+		fprintf(client.fp, "%s %s $ ", s_uname.nodename, client.cwd);
 		fflush(client.fp);
 	}
 }
@@ -433,19 +437,20 @@ int execfile(char **cmd, int bg) {
 	case 0: // Child
 		// if we run in background we change the process group so signals are ignored
 		if (bg == 1 && setpgid(0, 0) == -1) {
-			fprintf(client.fp,"execfile setpgid: %s\r\n",strerror(errno));
+			fprintf(client.fp, "execfile setpgid: %s\r\n", strerror(errno));
 		}
+		umask_fake();
 		path_fake();
 		cwd_fake();
 		dup2(client.sock, STDOUT_FILENO); /* duplicate socket on stdout */
 		dup2(client.sock, STDERR_FILENO); /* duplicate socket on stderr too */
 		if (execvp(cmd[0], cmd) == -1) {
-			fprintf(client.fp,"execfile execvp: %s\r\n",strerror(errno));
+			fprintf(client.fp, "execfile execvp: %s\r\n", strerror(errno));
 		}
 		exit(1);
 		break;
 	case -1: // Error forking
-		fprintf(client.fp,"forking error: %s\r\n",strerror(errno));
+		fprintf(client.fp, "forking error: %s\r\n", strerror(errno));
 		break;
 	default: // Parent
 		// parent process
