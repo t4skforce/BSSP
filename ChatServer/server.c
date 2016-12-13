@@ -13,145 +13,161 @@
 #define SOCKETQUEUE 5
 #define MAXCLIENTS 20
 #define MAXCLIENTBUFF 1024
+#define SENDBUFF (MAXCLIENTBUFF * 2) + 2
 #define SERVERPORT 4315
 
 typedef struct {
-  int sock;
-  char id[MAXCLIENTBUFF];
+	int sock;
+	FILE *fd;
+	char id[MAXCLIENTBUFF];
 } client_t;
 
 client_t* clientfds[MAXCLIENTS];
-int aktclients=0;
+int aktclients = 0;
 
 pthread_mutex_t clientfd_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int insert_client(client_t *client)
-{
-  pthread_mutex_lock(&clientfd_mutex);
-  if(aktclients >= MAXCLIENTS) {
-    pthread_mutex_unlock(&clientfd_mutex);
-    return 0;
-  }
-  clientfds[aktclients]=client;
-  ++aktclients;
-  pthread_mutex_unlock(&clientfd_mutex);
-  return 1;
+void clean_str(char *src,int len) {
+	int i;
+	src[len]=0;
+	int l = strlen(src)-1;
+	for (i = 0; i < l; i++) {
+		if (src[i] == '\r' || src[i] == '\n') {
+			src[i]=0;
+		}
+	}
 }
 
-void remove_client(client_t *client)
-{
+int insert_client(client_t *client) {
+	pthread_mutex_lock(&clientfd_mutex);
+	if (aktclients >= MAXCLIENTS) {
+		pthread_mutex_unlock(&clientfd_mutex);
+		return 0;
+	}
+	clientfds[aktclients] = client;
+	++aktclients;
+	pthread_mutex_unlock(&clientfd_mutex);
+	return 1;
+}
+
+void remove_client(client_t *client) {
 	int i;
 	pthread_mutex_lock(&clientfd_mutex);
-	for(i=0;i<aktclients;i++){
-		if(clientfds[i]==client) {
-			clientfds[i]=clientfds[aktclients-1];
+	for (i = 0; i < aktclients; i++) {
+		if (clientfds[i] == client) {
+			clientfds[i] = clientfds[aktclients - 1];
 			close(client->sock);
 			break;
 		}
 	}
-	clientfds[aktclients-1]=NULL;
+	clientfds[aktclients - 1] = NULL;
 	--aktclients;
 	pthread_mutex_unlock(&clientfd_mutex);
 }
 
 void tell_all_clients(char *line) {
-	int i;
-	pthread_mutex_lock(&clientfd_mutex);
-	for(i=0;i<aktclients;i++){
-		printf("send %d: %s\n",clientfds[i]->sock,line);
-		write(clientfds[i]->sock,line,strlen(line));
+	if (line[0] != 0) {
+		int i;
+		pthread_mutex_lock(&clientfd_mutex);
+		for (i = 0; i < aktclients; i++) {
+			printf("send %d: %s\n", clientfds[i]->sock, line);
+			fprintf(clientfds[i]->fd,"%s\n",line);
+			fflush(clientfds[i]->fd);
+		}
+		memset(line, 0, MAXCLIENTBUFF);
+		pthread_mutex_unlock(&clientfd_mutex);
 	}
-	memset(line, 0, MAXCLIENTBUFF);
-	pthread_mutex_unlock(&clientfd_mutex);
 }
 
 void* clienthandler(void *arg) {
-  client_t client = *(client_t *)arg;
-  char buf[MAXCLIENTBUFF];
-  char send_buf[(MAXCLIENTBUFF*2)+2];
-  int anz;
+	client_t client = *(client_t *) arg;
+	char buf[MAXCLIENTBUFF];
+	char send_buf[SENDBUFF] = { 0 };
+	int anz;
 
-  char *msg = "Client-ID: ";
-  do {
-	  write(client.sock , msg , strlen(msg));
-  } while((anz=read(client.sock, buf, MAXCLIENTBUFF-1)) <= 0);
-  buf[anz]=0;
-  strncpy(client.id,buf,strlen(buf));
+	do {
+		fprintf(client.fd,"Client-ID: ");
+		fflush(client.fd);
 
-  insert_client(&client);
+	} while ((anz = read(client.sock, buf, MAXCLIENTBUFF - 1)) <= 0);
+	clean_str(buf,anz);
+	strncpy(client.id, buf, strlen(buf));
+	insert_client(&client);
 
-  printf("%s joind the Server\n",client.id);
-  tell_all_clients(strcat(strcat(strcat(send_buf,client.id),": joind the Server"),buf));
-  while((anz=read(client.sock, buf, MAXCLIENTBUFF-1)) > 0){
-    buf[anz]=0;
-    if(strcmp(buf,"exit")==0) {
-    	break;
-    }
-    //printf("%s: %s",client.id,buf);
-    tell_all_clients(strncat(strcat(strcat(send_buf,client.id),": "),buf,strlen(buf)));
-  }
-  printf("%s left the Server\n",client.id);
-  remove_client(&client);
-  close(client.sock);
-  //free(arg);
+	printf("%s joind the Server\n", client.id);
+
+
+	snprintf(send_buf,SENDBUFF,"%s: joind the Server\n",client.id);
+	tell_all_clients(send_buf);
+
+	while ((anz = read(client.sock, buf, MAXCLIENTBUFF - 1)) > 0) {
+		clean_str(buf,anz);
+		if (strcmp(buf, "exit") == 0) {
+			break;
+		}
+		memset(send_buf, 0, (MAXCLIENTBUFF * 2) + 2);
+		snprintf(send_buf,SENDBUFF,"%s: %s\n",client.id,buf);
+	}
+	printf("%s left the Server\n", client.id);
+	remove_client(&client);
+	close(client.sock);
+	//free(arg);
 }
 
-int running=1;
+int running = 1;
 int endhandler() {
-  running = 0;
-  return 0;
+	running = 0;
+	return 0;
 }
 
-int main()
-{
-  struct sockaddr_in srvaddr;
-  memset(&srvaddr, '\0', sizeof(srvaddr));
-  struct sockaddr clientaddr;
-  int serverfd, clientfd;
-  int clientaddlen = sizeof(srvaddr);
-  pthread_t thrid;
-  int err;
+int main() {
+	struct sockaddr_in srvaddr;
+	struct sockaddr clientaddr;
+	int serverfd, clientfd;
+	int clientaddlen = sizeof(srvaddr);
+	pthread_t thrid;
+	int err;
 
-  srvaddr.sin_family = AF_INET;
-  srvaddr.sin_addr.s_addr = INADDR_ANY;
-  srvaddr.sin_port = htons((ushort)SERVERPORT);
+	srvaddr.sin_family = AF_INET;
+	srvaddr.sin_addr.s_addr = INADDR_ANY;
+	srvaddr.sin_port = htons((ushort) SERVERPORT);
 
-  if((serverfd = socket(AF_INET,SOCK_STREAM, 0)) == -1)
-  {
-    perror("socket:");
-    return 1;
-  }
+	if ((serverfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		perror("socket:");
+		return 1;
+	}
 
-  if(bind(serverfd, (struct sockaddr *) &srvaddr, sizeof(srvaddr))==-1) {
-    perror("bind:");
-    return 2;
-  }
+	if (bind(serverfd, (struct sockaddr *) &srvaddr, sizeof(srvaddr)) == -1) {
+		perror("bind:");
+		return 2;
+	}
 
-  if(listen(serverfd, SOCKETQUEUE) == -1) {
-    perror("listen:");
-    return 3;
-  }
+	if (listen(serverfd, SOCKETQUEUE) == -1) {
+		perror("listen:");
+		return 3;
+	}
 
-  while(running) {
-    if((clientfd = accept(serverfd, (struct sockaddr *)&clientaddr, (socklen_t*)&clientaddlen))==-1){
-      perror("accept:");
-      close(serverfd);
-      return 3;
-    }
+	while (running) {
+		if ((clientfd = accept(serverfd, (struct sockaddr *) &clientaddr, (socklen_t*) &clientaddlen)) == -1) {
+			perror("accept:");
+			close(serverfd);
+			return 3;
+		}
 
-    client_t *clnt = malloc(sizeof(client_t));
-    clnt->sock=clientfd;
-    // threadaddr belegen und übergeben
-    if((err = pthread_create(&thrid, NULL, clienthandler, (void *)clnt)) != 0) {
-      fprintf(stderr,"pthread_create: %s",strerror(err));
-      close(serverfd);
-      free(clnt);
-      return 4;
-    }
-  }
+		client_t *clnt = malloc(sizeof(client_t));
+		clnt->sock = clientfd;
+		clnt->fd = fopen(clientfd,"a");
+		// threadaddr belegen und übergeben
+		if ((err = pthread_create(&thrid, NULL, clienthandler, (void *) clnt)) != 0) {
+			fprintf(stderr, "pthread_create: %s", strerror(err));
+			close(serverfd);
+			free(clnt);
+			return 4;
+		}
+	}
 
-  // Melden an alle Clients
-  // ev. pthread_join
-  printf("goodby");
-  close(serverfd);
+	// Melden an alle Clients
+	// ev. pthread_join
+	printf("goodby");
+	close(serverfd);
 }
