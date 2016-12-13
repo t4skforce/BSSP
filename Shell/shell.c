@@ -192,13 +192,11 @@ int setpath(char **command, struct tm start) {
 	if (command[1] == NULL) {
 		fprintf(stderr, "expected argument to \"setpath\"\r\n");
 	} else {
-		char buff[4096] = { 0 };
-		strcat(strcat(buff, "PATH="), command[1]);
 		if (setenv("PATH", command[1], 1) != 0) {
 			perror("error setenv:");
 			return 0;
 		} else {
-			printf("new Path: %s\r\n", buff);
+			printf("new Path: %s\r\n", getenv("PATH"));
 		}
 	}
 	return 1;
