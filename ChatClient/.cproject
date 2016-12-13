@@ -90,11 +90,9 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.1623259052" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
 								<option id="gnu.c.link.option.libs.1045227130" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="pthread"/>
-									<listOptionValue builtIn="false" value="readline"/>
+									<listOptionValue builtIn="false" value="ncurses"/>
 								</option>
-								<option id="gnu.c.link.option.paths.1426862523" name="Library search path (-L)" superClass="gnu.c.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ChatClient/lib}&quot;"/>
-								</option>
+								<option id="gnu.c.link.option.paths.1426862523" name="Library search path (-L)" superClass="gnu.c.link.option.paths" valueType="libPaths"/>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1889024645" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>

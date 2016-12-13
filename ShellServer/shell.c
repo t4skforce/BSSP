@@ -1,5 +1,11 @@
-// shell.c
-
+/*
+ * Program: Shell Server
+ *
+ * Authors:
+ * is141415 - Neumair Florian
+ * is141305 - Gimpl Thomas
+ *
+ */
 #define POSIX_C_SOURCE 201112L
 
 #include <sys/socket.h>
@@ -17,11 +23,11 @@
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
-#define NAME "Name"
-#define MATNR "MatNR"
+#define NAME "Florian Neumair"
+#define MATNR "is141415"
 
 #define SOCKETQUEUE 5
-#define SERVERPORT 4315
+#define SERVERPORT 5315
 
 // parsing & helper
 char * readline(int socket, char *s, size_t max);
@@ -273,7 +279,7 @@ int setpath(char **command, struct tm start) {
 			perror("error setenv:");
 			return 0;
 		} else {
-			printf("new Path: %s\r\n", gentenv("PATH"));
+			printf("new Path: %s\r\n", getenv("PATH"));
 		}
 	}
 	return 1;

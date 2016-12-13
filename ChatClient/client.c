@@ -1,4 +1,11 @@
-// socket client
+/*
+ * Program: Socket Client
+ *
+ * Authors:
+ * is141415 - Neumair Florian
+ * is141305 - Gimpl Thomas
+ *
+ */
 #define POSIX_C_SOURCE 201112L
 
 #include <sys/socket.h>
