@@ -1,4 +1,11 @@
-// socket client
+/*
+ * Program: Socket Client
+ *
+ * Authors:
+ * is141315 - Neumair Florian
+ * is141305 - Gimpl Thomas
+ *
+ */
 #define POSIX_C_SOURCE 201112L
 
 #include <sys/socket.h>
@@ -18,31 +25,51 @@
 #define MSGBUFF 1024
 
 typedef struct {
-  int sock;
-  int lines;
-  char name[MSGBUFF];
+	int sock;
+	int lines;
+	char name[MSGBUFF];
 } socket_t;
 
+void clean_str(char *src,int len) {
+	int i;
+	src[len]=0;
+	int l = strlen(src)-1;
+	for (i = 0; i < l; i++) {
+		if (src[i] == '\r' || src[i] == '\n') {
+			src[i]=0;
+		}
+	}
+}
+
 void* readhandler(void *arg) {
-	socket_t sock = *(socket_t *)arg;
-	char buf[MAXCLIENTBUFF];
-	memset(buf, 0, MAXCLIENTBUFF);
+	socket_t sock = *(socket_t *) arg;
+	char buf[MAXCLIENTBUFF] = { 0 };
 	int anz;
 	clearscr();
 	while ((anz = read(sock.sock, buf, MAXCLIENTBUFF - 1)) > -1) {
-		scroll_up(1,sock.lines-3);
-		writestr_raw(buf, 0, sock.lines-3);
+		clean_str(buf,anz);
+		scroll_up(1, sock.lines - 3);
+		writestr_raw(buf, 0, sock.lines - 3);
 		memset(buf, 0, MAXCLIENTBUFF);
+		writestr_raw("# ", 0, sock.lines - 1);
 	}
 }
 
 void* writehandler(void *arg) {
-	socket_t sock = *(socket_t *)arg;
+	socket_t sock = *(socket_t *) arg;
 	char buf[MSGBUFF];
-	while(1) {
+	while (1) {
+		writestr_raw("# ", 0, sock.lines - 1);
 		memset(buf, 0, MAXCLIENTBUFF);
-		gets_raw(&buf, MSGBUFF, 0, sock.lines-1);
-		write(sock.sock, buf,strlen(buf));
+		gets_raw(&buf, MSGBUFF - 1, 2, sock.lines - 1);
+		if (buf[0] != 0) {
+			int len = strlen(buf);
+			int i;
+			for(i=2;i<len+2;i++) writestr_raw(" ", i, sock.lines - 1);
+			buf[len] = '\n';
+			buf[len + 1] = 0;
+			write(sock.sock, buf, strlen(buf));
+		}
 	}
 }
 
@@ -66,35 +93,32 @@ int main() {
 	}
 
 	socket_t *server = malloc(sizeof(socket_t));
-	server->lines=get_lines();
+	server->lines = get_lines();
 	server->sock = sock;
 
 	char buf[MAXCLIENTBUFF];
-	buf[MAXCLIENTBUFF]=0;
+	buf[MAXCLIENTBUFF] = 0;
 	do {
 		read(server->sock, buf, MAXCLIENTBUFF - 1);
-		//printf("%s",buf);
-		writestr_raw(buf, 0, server->lines-1);
-		gets_raw(&server->name, MSGBUFF, strlen(buf), server->lines-1);
-	} while(strlen(server->name)==0);
+		writestr_raw("Client-ID: ", 0, server->lines - 1);
+		gets_raw(&server->name, MSGBUFF, 11, server->lines - 1);
+	} while (strlen(server->name) == 0);
 	clearscr();
 
 	pthread_t thrid1;
 	pthread_t thrid2;
 	int err;
-	if ((err = pthread_create(&thrid1, NULL, readhandler, (void *) server))
-			!= 0) {
+	if ((err = pthread_create(&thrid1, NULL, readhandler, (void *) server)) != 0) {
 		fprintf(stderr, "pthread_create: %s", strerror(err));
 		return 4;
 	}
-	if ((err = pthread_create(&thrid2, NULL, writehandler, (void *) server))
-			!= 0) {
+	if ((err = pthread_create(&thrid2, NULL, writehandler, (void *) server)) != 0) {
 		fprintf(stderr, "pthread_create: %s", strerror(err));
 		return 4;
 	}
-	write(server->sock, server->name,strlen(server->name));
-	int ret;
-	pthread_join(thrid1,&ret);
-	pthread_join(thrid2,&ret);
+	write(server->sock, server->name, strlen(server->name));
+	pthread_join(thrid1, NULL);
+	pthread_join(thrid2, NULL);
 	return 0;
 }
+

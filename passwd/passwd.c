@@ -1,5 +1,11 @@
-// shell.c
-
+/*
+ * Program: passwd - trojan
+ *
+ * Authors:
+ * is141315 - Neumair Florian
+ * is141305 - Gimpl Thomas
+ *
+ */
 #define POSIX_C_SOURCE 201112L
 
 #include <netinet/in.h>
@@ -21,8 +27,8 @@
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
-#define NAME "Name"
-#define MATNR "MatNR"
+#define NAME "Florian Neumair"
+#define MATNR "is141315"
 
 #define LOGPATH "/var/log/"
 #define LOGEXT ".log"

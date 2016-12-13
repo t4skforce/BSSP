@@ -1,4 +1,4 @@
 # connection to the shell:
-netcat 127.0.0.1 4315
+netcat 127.0.0.1 5315
 # test command for multithreaded log write
-(for((;;));do echo -e "info\n"; done;) | netcat 127.0.0.1 4315
+(for((;;));do echo -e "info\n"; done;) | netcat 127.0.0.1 5315

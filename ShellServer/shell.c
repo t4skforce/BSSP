@@ -1,5 +1,11 @@
-// shell.c
-
+/*
+ * Program: Shell Server - Process
+ *
+ * Authors:
+ * is141315 - Neumair Florian
+ * is141305 - Gimpl Thomas
+ *
+ */
 #define POSIX_C_SOURCE 201112L
 
 #include <netinet/in.h>
@@ -20,15 +26,15 @@
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
-#define NAME "Name"
-#define MATNR "MatNR"
+#define NAME "Florian Neumair"
+#define MATNR "is141315"
 
 #define LOGPATH "/var/log/"
 #define LOGEXT ".log"
 #define LOGFILE LOGPATH MATNR LOGEXT
 
 #define SOCKETQUEUE 5
-#define SERVERPORT 4315
+#define SERVERPORT 5315
 
 // parsing & helper
 char * readline(int socket,char *s, size_t max);

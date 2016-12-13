@@ -1,6 +1,5 @@
 // rawio.h
 // simple routines for terminal rawio with cursor positioning and sync
-
 // liest 0-terminierten String maximaler Laenge an Spalte/Zeile Position
 char *gets_raw(char *s, int maxlen, int col, int row);
 

