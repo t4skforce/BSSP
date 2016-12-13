@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define DEBUG 1
+//#define DEBUG 1
 
 static char terminf_entry[1024];
 static char platz_fuer_termstrings[1024];

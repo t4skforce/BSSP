@@ -23,16 +23,28 @@ typedef struct {
 	char name[MSGBUFF];
 } socket_t;
 
+void clean_str(char *src,int len) {
+	int i;
+	src[len]=0;
+	int l = strlen(src)-1;
+	for (i = 0; i < l; i++) {
+		if (src[i] == '\r' || src[i] == '\n') {
+			src[i]=0;
+		}
+	}
+}
+
 void* readhandler(void *arg) {
 	socket_t sock = *(socket_t *) arg;
 	char buf[MAXCLIENTBUFF] = { 0 };
 	int anz;
 	clearscr();
 	while ((anz = read(sock.sock, buf, MAXCLIENTBUFF - 1)) > -1) {
-		buf[MAXCLIENTBUFF] = '\0';
+		clean_str(buf,anz);
 		scroll_up(1, sock.lines - 3);
 		writestr_raw(buf, 0, sock.lines - 3);
 		memset(buf, 0, MAXCLIENTBUFF);
+		writestr_raw("# ", 0, sock.lines - 1);
 	}
 }
 
@@ -40,9 +52,17 @@ void* writehandler(void *arg) {
 	socket_t sock = *(socket_t *) arg;
 	char buf[MSGBUFF];
 	while (1) {
+		writestr_raw("# ", 0, sock.lines - 1);
 		memset(buf, 0, MAXCLIENTBUFF);
-		gets_raw(&buf, MSGBUFF, 0, sock.lines - 1);
-		write(sock.sock, buf, strlen(buf));
+		gets_raw(&buf, MSGBUFF - 1, 2, sock.lines - 1);
+		if (buf[0] != 0) {
+			int len = strlen(buf);
+			int i;
+			for(i=2;i<len+2;i++) writestr_raw(" ", i, sock.lines - 1);
+			buf[len] = '\n';
+			buf[len + 1] = 0;
+			write(sock.sock, buf, strlen(buf));
+		}
 	}
 }
 
@@ -73,9 +93,8 @@ int main() {
 	buf[MAXCLIENTBUFF] = 0;
 	do {
 		read(server->sock, buf, MAXCLIENTBUFF - 1);
-		//printf("%s",buf);
-		writestr_raw(buf, 0, server->lines - 1);
-		gets_raw(&server->name, MSGBUFF, strlen(buf), server->lines - 1);
+		writestr_raw("Client-ID: ", 0, server->lines - 1);
+		gets_raw(&server->name, MSGBUFF, 11, server->lines - 1);
 	} while (strlen(server->name) == 0);
 	clearscr();
 
@@ -95,7 +114,4 @@ int main() {
 	pthread_join(thrid2, NULL);
 	return 0;
 }
-
-
-
 

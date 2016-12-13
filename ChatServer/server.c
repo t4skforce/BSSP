@@ -67,14 +67,13 @@ void remove_client(client_t *client) {
 
 void tell_all_clients(char *line) {
 	if (line[0] != 0) {
-		int i;
 		pthread_mutex_lock(&clientfd_mutex);
+		int i;
 		for (i = 0; i < aktclients; i++) {
 			printf("send %d: %s\n", clientfds[i]->sock, line);
 			fprintf(clientfds[i]->fd,"%s\n",line);
 			fflush(clientfds[i]->fd);
 		}
-		memset(line, 0, MAXCLIENTBUFF);
 		pthread_mutex_unlock(&clientfd_mutex);
 	}
 }
@@ -96,17 +95,13 @@ void* clienthandler(void *arg) {
 
 	printf("%s joind the Server\n", client.id);
 
-
 	snprintf(send_buf,SENDBUFF,"%s: joind the Server\n",client.id);
 	tell_all_clients(send_buf);
-
 	while ((anz = read(client.sock, buf, MAXCLIENTBUFF - 1)) > 0) {
 		clean_str(buf,anz);
-		if (strcmp(buf, "exit") == 0) {
-			break;
-		}
-		memset(send_buf, 0, (MAXCLIENTBUFF * 2) + 2);
+		memset(send_buf, 0, SENDBUFF);
 		snprintf(send_buf,SENDBUFF,"%s: %s\n",client.id,buf);
+		tell_all_clients(send_buf);
 	}
 	printf("%s left the Server\n", client.id);
 	remove_client(&client);
@@ -156,7 +151,7 @@ int main() {
 
 		client_t *clnt = malloc(sizeof(client_t));
 		clnt->sock = clientfd;
-		clnt->fd = fopen(clientfd,"a");
+		clnt->fd = fdopen(clientfd, "a");
 		// threadaddr belegen und übergeben
 		if ((err = pthread_create(&thrid, NULL, clienthandler, (void *) clnt)) != 0) {
 			fprintf(stderr, "pthread_create: %s", strerror(err));
