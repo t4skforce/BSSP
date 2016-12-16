@@ -22,7 +22,7 @@
 #include <fcntl.h>
 #include <pwd.h>
 #include <grp.h>
-#include <pthread.h>
+#include <semaphore.h>
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
@@ -37,7 +37,7 @@
 #define SERVERPORT 5315
 
 // parsing & helper
-char * readline(int socket,char *s, size_t max);
+char * readline(int socket, char *s, size_t max);
 void splitcommand(char *zeile, char ** vec);
 void prompt();
 
@@ -75,17 +75,18 @@ int isBG(char *line) {
 	return 0;
 }
 
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t mutex;
 FILE *LOGFD;
 
-void logcommand(char *ipaddr,char *cmd){
-	pthread_mutex_lock(&log_mutex);
-	fprintf(LOGFD,"%s: %s\n",ipaddr,cmd);
+void logcommand(char *ipaddr, char *cmd) {
+	// is not realy required fprintf handels the atomic write, uses internally flockfile
+	sem_wait(&mutex);
+	fprintf(LOGFD, "%s: %s\n", ipaddr, cmd);
 	fflush(LOGFD);
-	pthread_mutex_unlock(&log_mutex);
+	sem_post(&mutex);
 }
 
-void clienthandler(int socket,char *ipaddr, struct tm start) {
+void clienthandler(int socket, char *ipaddr, struct tm start) {
 	// redirect io to socket
 	char line[MAXLEN];
 	char * cmd[MAXWORDS];
@@ -97,13 +98,13 @@ void clienthandler(int socket,char *ipaddr, struct tm start) {
 	do {
 		prompt(); // display input prompt
 		readline(socket, line, MAXLEN); // read input line
-		if(line[0]!='\0'){
-			char logline[MAXLEN]={0};
-			strncpy(logline,line,strlen(line));
+		if (line[0] != '\0') {
+			char logline[MAXLEN] = { 0 };
+			strncpy(logline, line, strlen(line));
 			bg = isBG(line); // search &
 			splitcommand(line, cmd); // split command into parts (tokenize)
 			execstat = execcmd(cmd, bg, start); // run internal command or execute file in forked thread
-			if(execstat == 0) {
+			if (execstat == 0) {
 				logcommand(ipaddr, logline);
 			}
 			fflush(stdout);
@@ -143,6 +144,12 @@ int main(int argc, char **argv) {
 		return 3;
 	}
 
+	/* create, initialize semaphore */
+	if (sem_init(&mutex, 1, 1) < 0) {
+		perror("semaphore initilization");
+		exit(0);
+	}
+
 	while (1) {
 		if ((clientfd = accept(serverfd, (struct sockaddr *) &clientaddr,
 				(socklen_t*) &clientaddlen)) == -1) {
@@ -150,7 +157,9 @@ int main(int argc, char **argv) {
 			close(serverfd);
 			return 3;
 		}
-		inet_ntop(clientaddr.sa_family, &(((struct sockaddr_in *) &clientaddr)->sin_addr), ipstr, clientaddlen);
+		inet_ntop(clientaddr.sa_family,
+				&(((struct sockaddr_in *) &clientaddr)->sin_addr), ipstr,
+				clientaddlen);
 		pid_t pid = fork();
 		switch (pid) {
 		case 0: // Child
@@ -170,24 +179,24 @@ int main(int argc, char **argv) {
 /**
  * read input line, dismiss \n at end
  */
-char * readline(int socket,char *s, size_t max) {
+char * readline(int socket, char *s, size_t max) {
 	ssize_t numRead;
 	size_t totRead = 0;
 	char ch;
 	int i;
-	for (i=0;i<max;i++) {
+	for (i = 0; i < max; i++) {
 		numRead = read(socket, &ch, 1);
 		if (numRead == -1) { /* Error */
 			break;
 		} else if (numRead == 0) { /* EOF */
 			break;
 		} else {
-			if (ch == '\n' || ch == '\r'){
+			if (ch == '\n' || ch == '\r') {
 				break;
 			}
-			if (totRead < max - 1) {      /* Discard > (n - 1) bytes */
+			if (totRead < max - 1) { /* Discard > (n - 1) bytes */
 				totRead++;
-				*s++=ch;
+				*s++ = ch;
 			}
 		}
 	}
@@ -298,7 +307,9 @@ int printenv(char **command, struct tm start) {
 int info(char **command, struct tm start) {
 	printf("Shell von: %s %s\r\n", NAME, MATNR);
 	printf("PID: %i\r\n", getpid());
-	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday, start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min, start.tm_sec);
+	printf("Läuft seit: %d.%d.%d %d:%d:%d Uhr\r\n", start.tm_mday,
+			start.tm_mon + 1, start.tm_year + 1900, start.tm_hour, start.tm_min,
+			start.tm_sec);
 	return 0;
 }
 
@@ -309,7 +320,7 @@ int setpath(char **command, struct tm start) {
 	if (command[1] == NULL) {
 		fprintf(stderr, "expected argument to \"setpath\"\r\n");
 	} else {
-		if (setenv("PATH",command[1], 1) != 0) {
+		if (setenv("PATH", command[1], 1) != 0) {
 			perror("error setenv:");
 			return 1;
 		} else {
@@ -341,13 +352,13 @@ int sumask(char **command, struct tm start) {
  */
 int getlog(char **command, struct tm start) {
 	if (command[1] == NULL) {
-		fprintf(stderr, "expected argument to \"%s\"\r\n",command[0]);
+		fprintf(stderr, "expected argument to \"%s\"\r\n", command[0]);
 	} else {
 		int retVal;
-		char * cmd[]={"tail","-n",command[1],LOGFILE,NULL};
-		pthread_mutex_lock(&log_mutex);
-		retVal = execfile(cmd,0);
-		pthread_mutex_unlock(&log_mutex);
+		char * cmd[] = { "tail", "-n", command[1], LOGFILE, NULL };
+		sem_wait(&mutex);
+		retVal = execfile(cmd, 0);
+		sem_post(&mutex);
 		return retVal;
 	}
 	return 0;
