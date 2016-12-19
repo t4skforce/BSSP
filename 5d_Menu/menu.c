@@ -13,34 +13,35 @@
 #include "share.h"
 
 int main(int argc, char *argv[]) {
-	char buff[MSG_LEN];
-	int len;
-	struct mq_attr attr = { 0, MQCNT, MSG_LEN, 0 };
-	mqd_t mqueue;
-
-	if ((mqueue = mq_open(MQNAME, O_WRONLY | O_CREAT, 0644, &attr)) == -1) {
-		perror("mq_open");
+	struct mq_attr attr = { 0, MAX_MSG_COUNT, MAX_MSG_LEN, 0 };
+	mqd_t queue = mq_open(QUEUE_NAME, O_WRONLY | O_CREAT, 0644, &attr);
+	if (queue == -1) {
+		perror(QUEUE_NAME);
 		return 1;
 	}
+	char line[MAX_MSG_LEN];
 	do {
+		int len;
 		printf("> ");
-		fgets(buff, MSG_LEN, stdin);
-		len = strlen(buff);
+		fgets(line, MAX_MSG_LEN, stdin);
+		len = strlen(line);
 
-		if (len > 0 && buff[len - 1] == '\n') {
-			buff[len - 1] = '\0';
+		if (len > 0 && line[len - 1] == '\n') {
+			line[len - 1] = '\0';
 			len--;
 		}
 
-		if (!strcmp("sleep", buff)) {
+		if(!strcmp(line,"sleep")) {
 			sleep(20);
 		}
 
-		if (mq_send(mqueue, buff, strlen(buff) + 1, 0) == -1) {
-			perror("mq_send");
-			break;
+		if (mq_send(queue, line, len+1, 7) == -1) {
+			perror(QUEUE_NAME);
+			mq_close(queue);
+			return 1;
 		}
-	} while (strcmp("quit", buff));
-	mq_close(mqueue);
+
+	} while (strcmp(line, "quit"));
+	mq_close(queue);
 	return 0;
 }

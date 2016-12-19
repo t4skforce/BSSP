@@ -10,7 +10,7 @@
 
 #define MAX_MSG_LEN 256
 
-#define QUEUE_NAME "/is131415"
+#define QUEUE_NAME "/is141315"
 
 #define MAX_MSG_COUNT 10
 

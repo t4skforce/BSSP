@@ -15,7 +15,7 @@
 #include "share.h"
 
 int main(int argc, char *argv[]) {
-	char buff[MSG_LEN];
+	char buff[MAX_MSG_LEN];
 	ssize_t len;
 	int fd;
 
@@ -25,12 +25,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	do {
-		if ((len = read(fd, buff, MSG_LEN)) == -1) {
+		if ((len = read(fd, buff, MAX_MSG_LEN)) == -1) {
 			perror("read");
 			break;
 		}
 
-		buff[MSG_LEN - 1] = '\0';
+		buff[MAX_MSG_LEN - 1] = '\0';
 		printf("%s\n", buff);
 	} while (strcmp("QUIT", buff));
 

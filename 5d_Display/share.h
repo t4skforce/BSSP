@@ -8,9 +8,9 @@
 #ifndef SHARE_H_
 #define SHARE_H_
 
-#define MQNAME "/is131415mq"
-#define MQCNT 10
-#define MSG_LEN 1024
+#define QUEUE_NAME "/is141315"
+#define MAX_MSG_COUNT 10
+#define MAX_MSG_LEN 1024
 
 #define PNAME "/tmp/is141315pipe"
 
