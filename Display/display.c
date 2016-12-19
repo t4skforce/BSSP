@@ -2,7 +2,10 @@
  * display.c
  *
  *  Created on: Dec 16, 2016
- *      Author: bssp
+ *
+ * Authors:
+ * is141315 - Neumair Florian
+ * is141305 - Gimpl Thomas
  */
 #include <stdio.h>
 #include <string.h>
