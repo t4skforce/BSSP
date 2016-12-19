@@ -19,10 +19,12 @@ int main(int argc, char *argv[]) {
 	ssize_t len;
 	int fd;
 
+	printf("%s open pipe\n",PNAME);
 	if ((fd = open(PNAME, O_RDONLY)) == -1) {
 		perror("open");
 		return 1;
 	}
+	printf("%s  opend pipe\n",PNAME);
 
 	do {
 		if ((len = read(fd, buff, MAX_MSG_LEN)) == -1) {

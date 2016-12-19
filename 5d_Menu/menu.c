@@ -8,11 +8,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <mqueue.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "share.h"
 
-int main(int argc, char *argv[]) {
+int main() {
 	struct mq_attr attr = { 0, MAX_MSG_COUNT, MAX_MSG_LEN, 0 };
 	mqd_t queue = mq_open(QUEUE_NAME, O_WRONLY | O_CREAT, 0644, &attr);
 	if (queue == -1) {
@@ -31,11 +33,11 @@ int main(int argc, char *argv[]) {
 			len--;
 		}
 
-		if(!strcmp(line,"sleep")) {
+		if (!strcmp(line, "sleep")) {
 			sleep(20);
 		}
 
-		if (mq_send(queue, line, len+1, 7) == -1) {
+		if (mq_send(queue, line, len + 1, 7) == -1) {
 			perror(QUEUE_NAME);
 			mq_close(queue);
 			return 1;
