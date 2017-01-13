@@ -408,7 +408,7 @@ static ssize_t mydev_write(struct file *filep, const char __user *buff,
 	}
 
 	// ho much can w write into buffer
-	allowed_count = BUFFER_SIZE - *offset;
+	allowed_count = dev->buffer_size - *offset;
 	if (allowed_count < count) {
 		count = allowed_count;
 	}
