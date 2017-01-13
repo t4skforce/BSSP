@@ -522,6 +522,12 @@ static long mydev_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 			case IOC_NR_SETBUFFERSIZE:
 				new_buffer_size = (int) arg;
 				pr_info("mydev_ioctl(): new size %d\n", new_buffer_size);
+
+				if(new_buffer_size <= 0){
+					pr_info("mydev_ioctl(): given value to small!");
+					return -ENOMEM;
+				}
+
 				if (new_buffer_size == dev->buffer_size) {
 					// nothing to do size is already set
 					break;
