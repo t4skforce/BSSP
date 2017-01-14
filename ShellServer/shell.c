@@ -23,6 +23,8 @@
 #include <pwd.h>
 #include <grp.h>
 #include <semaphore.h>
+#include <dirent.h>
+#include <errno.h>
 
 #define MAXLEN 2048
 #define MAXWORDS 1024
@@ -51,12 +53,14 @@ int printenv(char **command, struct tm start);
 int info(char **command, struct tm start);
 int setpath(char **command, struct tm start);
 int getlog(char **command, struct tm start);
+int listdir(char **command, struct tm start);
+
 
 // internal command mapping
 char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info",
-		"setpath", "getprot", "getlog" };
+		"setpath", "getprot", "getlog", "listdir" };
 int (*builtin_func[])(char **,
-		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog
+		struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog, &listdir
 };
 int builtin_cnt() {
 	return sizeof(builtin_cmd) / sizeof(char *);
@@ -381,6 +385,54 @@ void prompt() {
 void parent_trap(int sig) {
 	fprintf(stderr, "\nCaught signal(%i).\n", sig);
 	signal(sig, &parent_trap);
+}
+
+int listdir(char **command, struct tm start) {
+	int retVal = 0;
+	DIR *dir;
+	struct stat srcdir;
+	if (command[1] == NULL) {
+		fprintf(stdout, "expected argument to \"listdir\"\r\n");
+	} else {
+		struct dirent *dentry;
+		struct stat st;
+		char name[4096];
+		char *type;
+
+		if (lstat(command[1], &srcdir) == -1) {
+			fprintf(stdout, "open dir: %s\r\n", strerror(errno));
+			return 1;
+		}
+
+		if (!S_ISDIR(srcdir.st_mode)) {
+			fprintf(stdout, "not a dir: %s\r\n", command[1]);
+			return 2;
+		}
+		dir = opendir(command[1]);
+		if (!dir) {
+			fprintf(stdout, "cant read dir: %s\r\n", command[1]);
+			return 1;
+		}
+		while ((dentry = readdir(dir)) != NULL) {
+			snprintf(name,4096,"%s%s",command[1],dentry->d_name);
+			if(dentry->d_type & DT_REG) {
+				type = "File";
+			} else if(dentry->d_type & DT_DIR) {
+				type = "Directory";
+			} else {
+				continue;
+			}
+
+			if(stat(name, &st) != 0) {
+				fprintf(stdout, "error stat'ing %s\r\n", name);
+				continue;
+			}
+			int size = st.st_size;
+			fprintf(stdout, "%s\t%s\t%d\r\n", name, type, size);
+		}
+	}
+	fflush(stdout);
+	return retVal;
 }
 
 /**

@@ -397,14 +397,14 @@ static ssize_t mydev_write(struct file *filep, const char __user *buff,
 
 	dev = filep->private_data;
 
-	// reset offset after clear operation
-	if (*offset > dev->current_length) {
-		*offset = dev->current_length;
-	}
-
 	// get lock
 	if (down_interruptible(&dev->sync)) {
 		return -ERESTARTSYS;
+	}
+
+	// reset offset after clear operation
+	if (*offset > dev->current_length || filep->f_flags & O_APPEND) { // added o_append offset shift to end of content
+		*offset = dev->current_length;
 	}
 
 	// ho much can w write into buffer
@@ -488,7 +488,9 @@ static long mydev_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	struct my_cdev *dev;
 	long retVal = 0;
 	int new_buffer_size;
+	int trunc_size;
 	char *new_buff;
+	int i;
 	pr_info("mydev_ioctl()\n");
 	dev = filep->private_data;
 
@@ -559,6 +561,29 @@ static long mydev_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 				}
 				// set new size
 				dev->buffer_size = new_buffer_size;
+			case IOC_NR_TRUNCATE:
+				trunc_size = (int) arg;
+				retVal = dev->current_length;
+				if(trunc_size > dev->buffer_size || trunc_size < 0){
+					retVal = -EINVAL;
+					break;
+				}
+				if(dev->buffer == NULL){
+					retVal = -EFAULT;
+					break;
+				}
+
+				if(trunc_size > dev->current_length) { // fill Zeros
+					for(i=dev->current_length;i<trunc_size;i++){
+						dev->buffer[i]=0;
+					}
+					dev->current_length = trunc_size;
+				} else if(trunc_size < dev->current_length) { // make smaller
+					dev->current_length = trunc_size;
+				} else {
+					pr_info("mydev_ioctl(): truncate nothing to do same size as before!");
+				}
+				wake_up(&dev->wq_write);
 			default:
 				;
 		}

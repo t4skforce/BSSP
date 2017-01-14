@@ -24,7 +24,9 @@
 #include <grp.h>
 #include <pthread.h>
 #include <errno.h>
+#include <dirent.h>
 
+#define MAXCLIENTS 2048
 #define MAXLEN 2048
 #define MAXWORDS 1024
 #define NAME "Neumair Florian"
@@ -49,6 +51,10 @@ typedef struct {
 	struct tm start;
 } client_t;
 
+client_t* clients[MAXCLIENTS];
+pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
+int aktclients = 0;
+
 // thread local variable of client status
 // https://en.wikipedia.org/wiki/Thread-local_storage
 static __thread client_t client;
@@ -72,11 +78,12 @@ int info(char **command, struct tm start);
 int setpath(char **command, struct tm start);
 int getlog(char **command, struct tm start);
 int clientinfo(char **command, struct tm start);
+int quitsession(char **command, struct tm start);
+int stopserver(char **command, struct tm start);
 
 // internal command mapping
-char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info", "setpath", "getprot", "getlog", "clientinfo" };
-int (*builtin_func[])(char **, struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog, &clientinfo
-};
+char *builtin_cmd[] = { "cd", "pwd", "id", "exit", "umask", "printenv", "info", "setpath", "getprot", "getlog", "clientinfo", "quit-session", "stop-server" };
+int (*builtin_func[])(char **, struct tm) = {&cd, &pwd, &id, &sexit, &sumask, &printenv, &info, &setpath, &getlog, &getlog, &clientinfo, &quitsession, &stopserver};
 int builtin_cnt() {
 	return sizeof(builtin_cmd) / sizeof(char *);
 }
@@ -110,9 +117,49 @@ void logcommand(char *ipaddr, char *cmd) {
 	pthread_mutex_unlock(&log_mutex);
 }
 
+int insert_client(client_t *client) {
+	pthread_mutex_lock(&client_mutex);
+	if (aktclients >= MAXCLIENTS) {
+		pthread_mutex_unlock(&client_mutex);
+		return 0;
+	}
+	clients[aktclients] = client;
+	++aktclients;
+	pthread_mutex_unlock(&client_mutex);
+	return 1;
+}
+
+void remove_client(client_t *client) {
+	int i;
+	pthread_mutex_lock(&client_mutex);
+	for (i = 0; i < aktclients; i++) {
+		if (clients[i] == client) {
+			clients[i] = clients[aktclients - 1];
+			close(client->sock);
+			break;
+		}
+	}
+	clients[aktclients - 1] = NULL;
+	--aktclients;
+	pthread_mutex_unlock(&client_mutex);
+}
+
+void tell_all_clients(char *line) {
+	if (line[0] != 0) {
+		pthread_mutex_lock(&client_mutex);
+		int i;
+		for (i = 0; i < aktclients; i++) {
+			fprintf(clients[i]->fp,"%s\n",line);
+			fflush(clients[i]->fp);
+		}
+		pthread_mutex_unlock(&client_mutex);
+	}
+}
+
 void clienthandler(void * arg) {
 	memcpy(&client, &(*(client_t *) arg), sizeof(client_t)); // set thread local values
 	free(arg); // free maloc value
+	insert_client(&client);
 	// redirect io to socket
 	char line[MAXLEN];
 	char * cmd[MAXWORDS];
@@ -134,9 +181,12 @@ void clienthandler(void * arg) {
 		}
 	} while (execstat != -1); // run in loop until execcmd returns != 1
 	fprintf(client.fp, "disconnect.\n");
+	remove_client(&client);
 	close(client.sock);
 }
 
+int running = 1;
+int serverfd;
 int main(int argc, char **argv) {
 	time_t t = time(NULL);
 	struct tm start = *localtime(&t);
@@ -144,7 +194,7 @@ int main(int argc, char **argv) {
 
 	struct sockaddr_in srvaddr;
 	struct sockaddr clientaddr;
-	int serverfd, clientfd;
+	int clientfd;
 	int clientaddlen = sizeof(srvaddr);
 
 	srvaddr.sin_family = AF_INET;
@@ -175,7 +225,7 @@ int main(int argc, char **argv) {
 	client.mask = umask(0);
 	umask(client.mask);
 
-	while (1) {
+	while (running) {
 		if ((clientfd = accept(serverfd, (struct sockaddr *) &clientaddr, (socklen_t*) &clientaddlen)) == -1) {
 			perror("accept:");
 			close(serverfd);
@@ -245,6 +295,18 @@ void splitcommand(char *zeile, char ** vec) {
 int sexit(char **command, struct tm start) {
 	fprintf(client.fp, "Goodbye!\r\n");
 	return -1;
+}
+
+int quitsession(char **command, struct tm start) {
+	return sexit(command,start);
+}
+
+int stopserver(char **command, struct tm start) {
+	tell_all_clients("Server going down");
+	running = 0;
+	fclose(LOGFD); // close log
+	close(serverfd); // close socket
+	exit(0); // exit
 }
 
 /**
@@ -343,6 +405,8 @@ int clientinfo(char **command, struct tm start) {
 	fprintf(client.fp, "CWD: %s \r\n", client.cwd);
 	return 0;
 }
+
+
 
 /**
  * Change into thread-local working directory

@@ -17,7 +17,7 @@ default:
 
 clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
-	rm -f ./test ./clear ./resize
+	rm -f ./test ./clear ./resize ./truncate
 
 insmod:
 	sudo insmod $(DRIVER).ko
@@ -32,5 +32,6 @@ test:
 	gcc -Wall -o test test.c
 	gcc -Wall -o clear ioctl_clear.c
 	gcc -Wall -o resize ioctl_resize.c
+	gcc -Wall -o truncate ioctl_truncate.c
 	
 endif
